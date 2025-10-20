@@ -1,0 +1,60 @@
+/interface vlan
+add interface=Client name=vlan-TR609 vlan-id=100
+add interface=Client name=vlan-tr609-1011 vlan-id=1011
+
+/ip dhcp-server option
+add code=43 force=yes name=ACS value=\
+    0x0118687474703A2F2F3139322E3136382E382E31303A37353437
+
+/ip pool
+
+add name=Pool_TR609 ranges=\
+    192.168.32.2-192.168.33.0,192.168.33.2-192.168.33.254
+add name=Pool_vlan-tr609-1011 ranges=10.15.2.2-10.15.3.254
+
+/ip dhcp-server
+add address-pool=dhcp_pool3 interface=ether9-ACS name=dhcp4
+add address-pool=Pool_TR609 interface=vlan-TR609 name=dhcp6
+add address-pool=Pool_vlan-tr609-1011 interface=vlan-tr609-1011 name=dhcp7
+
+/ip address
+add address=192.168.33.1/23 interface=vlan-TR609 network=192.168.32.0
+add address=10.15.2.1/23 interface=vlan-tr609-1011 network=10.15.2.0
+add address=192.168.8.1/24 interface=ether9-ACS network=192.168.8.0
+
+
+/ip dhcp-server network
+add address=10.15.2.0/23 gateway=10.15.2.1
+add address=192.168.33.0/23 gateway=192.168.32.1
+add address=192.168.8.0/24 gateway=192.168.8.1
+
+/ip dns static
+add address=192.168.8.10 name=acs.id.myrepublic.net type=A
+add address=192.168.8.10 name=acs type=A
+add address=192.168.8.10 name=xlacs.xl.co.id type=A
+add address=192.168.8.10 name=acs.telkom.net type=A
+add address=192.168.8.10 name=acs.net type=A
+add address=192.168.8.10 name=acs-new.telkom.net type=A
+add address=192.168.8.10 name=devacs.edatahome.com type=A
+add address=192.168.8.10 name=RMS.chinamobile.com type=A
+add address=208.67.222.222 name=doh.opendns.com type=A
+add address=208.67.220.220 name=doh.opendns.com type=A
+
+/ip firewall nat
+add action=masquerade chain=srcnat out-interface=ether9-ACS
+add action=redirect chain=dstnat comment="ACS GPON V100" dst-port=53,5353 \
+    in-interface=vlan-TR609 protocol=udp to-ports=53
+add action=redirect chain=dstnat comment="ACS GPON V1011" dst-port=53,5353 \
+    in-interface=vlan-tr609-1011 protocol=udp to-ports=53
+add action=dst-nat chain=dstnat comment="ACS GPON V100" dst-address=\
+    !192.168.8.10 dst-port=7547 in-interface=vlan-TR609 protocol=tcp \
+    to-addresses=192.168.8.10 to-ports=7547
+add action=dst-nat chain=dstnat comment="ACS GPON V1011" dst-address=\
+    !192.168.8.10 dst-port=7547 in-interface=vlan-tr609-1011 protocol=tcp \
+    to-addresses=192.168.8.10 to-ports=7547
+add action=dst-nat chain=dstnat comment="ACS GPON V100" dst-port=!7547 \
+    in-interface=vlan-TR609 protocol=tcp to-addresses=192.168.8.10 to-ports=\
+    7547
+add action=dst-nat chain=dstnat comment="ACS GPON V1011" dst-port=!7547 \
+    in-interface=vlan-tr609-1011 protocol=tcp to-addresses=192.168.8.10 \
+    to-ports=7547
