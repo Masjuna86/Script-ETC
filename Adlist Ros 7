@@ -1,0 +1,6 @@
+/ip dns adlist
+add ssl-verify=no url=\
+    https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+add ssl-verify=no url=https://small.oisd.nl
+add ssl-verify=no url="https://raw.githubusercontent.com/hagezi/dns-blocklists\
+    /main/adblock/pro.mini.txt"
