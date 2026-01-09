@@ -1,0 +1,80 @@
+############################################
+# ADBLOCK FINAL MIKROTIK
+# Safe - Stable - Low CPU
+############################################
+
+/ip dns
+set allow-remote-requests=yes cache-size=4096KiB servers=1.1.1.1,8.8.8.8
+
+############################################
+# DNS STATIC ADBLOCK
+############################################
+/ip dns static
+add address=0.0.0.0 name=ads.google.com
+add address=0.0.0.0 name=pagead2.googlesyndication.com
+add address=0.0.0.0 name=googlesyndication.com
+add address=0.0.0.0 name=doubleclick.net
+add address=0.0.0.0 name=securepubads.g.doubleclick.net
+add address=0.0.0.0 name=ads.facebook.com
+add address=0.0.0.0 name=ads.instagram.com
+add address=0.0.0.0 name=ads.twitter.com
+add address=0.0.0.0 name=ads.tiktok.com
+add address=0.0.0.0 name=ads.yahoo.com
+add address=0.0.0.0 name=ads.microsoft.com
+
+/ip dns static
+add name=ads.doubleclick.net address=0.0.0.0
+add name=ad.doubleclick.net address=0.0.0.0
+add name=adservice.google.com address=0.0.0.0
+add name=pagead2.googlesyndication.com address=0.0.0.0
+add name=pagead46.l.doubleclick.net address=0.0.0.0
+add name=pagead-googlehosted.l.google.com address=0.0.0.0
+add name=g.doubleclick.net address=0.0.0.0
+add name=imasdk.googleapis.com address=0.0.0.0
+add name=tpc.googlesyndication.com address=0.0.0.0
+add name=video-stats.l.google.com address=0.0.0.0
+add name=ad.youtube.com address=0.0.0.0
+add name=googleads.g.doubleclick.net address=0.0.0.0
+add name=ad.facebook.com address=0.0.0.0
+add name=connect.facebook.net address=0.0.0.0
+add name=staticxx.facebook.com address=0.0.0.0
+add name=graph.facebook.com address=0.0.0.0
+add name=taboola.com address=0.0.0.0
+add name=trc.taboola.com address=0.0.0.0
+add name=outbrain.com address=0.0.0.0
+add name=widgets.outbrain.com address=0.0.0.0
+add name=ads-twitter.com address=0.0.0.0
+add name=syndication.twitter.com address=0.0.0.0
+add name=ads.linkedin.com address=0.0.0.0
+add name=ads.pinterest.com address=0.0.0.0
+add name=analytics.twitter.com address=0.0.0.0
+add name=collector.githubapp.com address=0.0.0.0
+add name=stats.g.doubleclick.net address=0.0.0.0
+add name=bat.bing.com address=0.0.0.0
+add name=ads.yahoo.com address=0.0.0.0
+add name=adserver.yahoo.com address=0.0.0.0
+add name=securepubads.g.doubleclick.net address=0.0.0.0
+add name=cdn.krxd.net address=0.0.0.0
+add name=adsrvr.org address=0.0.0.0
+add name=ads.tiktok.com address=0.0.0.0
+add name=analytics.tiktok.com address=0.0.0.0
+
+############################################
+# RAW RULE - CAPTURE IKLAN TLS
+############################################
+/ip firewall raw
+add chain=prerouting protocol=tcp dst-port=80,443 tls-host=*ads* action=add-dst-to-address-list address-list=IKLAN address-list-timeout=1d
+add chain=prerouting protocol=tcp dst-port=80,443 tls-host=*doubleclick* action=add-dst-to-address-list address-list=IKLAN address-list-timeout=1d
+add chain=prerouting protocol=tcp dst-port=80,443 tls-host=*googlesyndication* action=add-dst-to-address-list address-list=IKLAN address-list-timeout=1d
+add chain=prerouting protocol=tcp dst-port=80,443 tls-host=*adservice* action=add-dst-to-address-list address-list=IKLAN address-list-timeout=1d
+add chain=prerouting protocol=tcp dst-port=80,443 tls-host=*adsystem* action=add-dst-to-address-list address-list=IKLAN address-list-timeout=1d
+
+############################################
+# FIREWALL FILTER - DROP IKLAN
+############################################
+/ip firewall filter
+add chain=forward dst-address-list=IKLAN action=drop comment="DROP IKLAN GLOBAL"
+
+############################################
+# END SCRIPT
+############################################
