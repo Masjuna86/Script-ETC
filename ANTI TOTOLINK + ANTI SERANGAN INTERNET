@@ -1,0 +1,167 @@
+# =================================================
+# ANTI TOTOLINK + ANTI SERANGAN INTERNET
+# AUTO BLOCK PPPoE USER (ADDRESS-LIST)
+# Mikrotik RB1100 | RouterOS v6
+# =================================================
+
+:log info "SECURITY: Start Anti Totolink + Anti Internet + PPPoE Auto Block"
+
+# =================================================
+# [1] BRIDGE PROTECTION (WAJIB)
+# =================================================
+/interface bridge settings
+set use-ip-firewall=yes
+set use-ip-firewall-for-vlan=yes
+
+# =================================================
+# [2] CLEAN RULE LAMA
+# =================================================
+/ip firewall filter remove [find comment~"SEC-"]
+/ip firewall address-list remove [find list=whitelist-sec]
+/ip firewall address-list remove [find list=ddoser]
+/ip firewall address-list remove [find list=inet-attacker]
+/ip firewall address-list remove [find list=pppoe-blocked]
+
+# =================================================
+# [3] ADDRESS-LIST WHITELIST
+# =================================================
+/ip firewall address-list
+add list=whitelist-sec address=127.0.0.1 comment="SEC-localhost"
+add list=whitelist-sec address=8.8.8.8 comment="SEC-GoogleDNS"
+add list=whitelist-sec address=8.8.4.4
+add list=whitelist-sec address=1.1.1.1 comment="SEC-Cloudflare"
+add list=whitelist-sec address=1.0.0.1 comment="SEC-Cloudflare"
+
+# DNS router otomatis
+:foreach d in=[/ip dns get servers] do={
+    :if ([:len $d] > 0) do={
+        /ip firewall address-list add list=whitelist-sec address=$d comment="SEC-DNS Router"
+    }
+}
+
+# Gateway default
+:local gw [/ip route get [find dst-address=0.0.0.0/0] gateway]
+:if ([:len $gw] > 0) do={
+    /ip firewall address-list add list=whitelist-sec address=$gw comment="SEC-Gateway"
+}
+
+# =================================================
+# [4] PROTEKSI INPUT DARI INTERNET (ether1)
+# =================================================
+/ip firewall filter
+add chain=input connection-state=invalid action=drop comment="SEC-DROP invalid input"
+
+add chain=input in-interface=ether1 connection-state=established,related \
+action=accept comment="SEC-Allow established input"
+
+add chain=input in-interface=ether1 src-address-list=whitelist-sec \
+action=accept comment="SEC-Allow whitelist inet"
+
+add chain=input in-interface=ether1 protocol=tcp connection-state=new \
+dst-limit=20,20,src-address/10s action=accept comment="SEC-Allow normal input"
+
+add chain=input in-interface=ether1 protocol=tcp connection-state=new \
+action=add-src-to-address-list address-list=inet-attacker address-list-timeout=1h \
+comment="SEC-Mark inet attacker"
+
+add chain=input src-address-list=inet-attacker action=drop \
+comment="SEC-DROP inet attacker" place-before=0
+
+# =================================================
+# [5] INIT CHAIN
+# =================================================
+/ip firewall filter
+add chain=sec-out action=return comment="SEC-init"
+add chain=sec-in-lan action=return comment="SEC-init"
+
+# =================================================
+# [6] DETEKSI OUTBOUND FLOOD (TOTOLINK)
+# =================================================
+/ip firewall filter
+add chain=forward connection-state=new in-interface=pppoe* out-interface=ether1 \
+action=jump jump-target=sec-out comment="SEC-Out detect"
+
+add chain=sec-out dst-address-list=whitelist-sec action=return \
+comment="SEC-Out whitelist"
+
+add chain=sec-out dst-limit=40,40,src-and-dst-addresses/10s action=return \
+comment="SEC-Out normal"
+
+add chain=sec-out action=add-src-to-address-list \
+address-list=ddoser address-list-timeout=30m comment="SEC-Mark ddoser"
+
+# =================================================
+# [7] UDP & ICMP FLOOD (TOTOLINK)
+# =================================================
+/ip firewall filter
+add chain=forward protocol=udp in-interface=pppoe* out-interface=ether1 \
+dst-limit=60,60,src-address/10s action=accept comment="SEC-UDP normal"
+
+add chain=forward protocol=udp in-interface=pppoe* out-interface=ether1 \
+action=add-src-to-address-list address-list=ddoser address-list-timeout=30m \
+comment="SEC-UDP flood"
+
+add chain=forward protocol=icmp in-interface=pppoe* out-interface=ether1 \
+dst-limit=4,4,src-address/10s action=accept comment="SEC-ICMP normal"
+
+add chain=forward protocol=icmp in-interface=pppoe* out-interface=ether1 \
+action=add-src-to-address-list address-list=ddoser address-list-timeout=30m \
+comment="SEC-ICMP flood"
+
+# =================================================
+# [8] BLOK BROADCAST & MULTICAST
+# =================================================
+/ip firewall filter
+add chain=forward protocol=udp dst-address=255.255.255.255 \
+action=drop comment="SEC-DROP UDP broadcast"
+
+add chain=forward dst-address-type=multicast \
+action=drop comment="SEC-DROP multicast"
+
+# =================================================
+# [9] DROP USER TERBLOKIR
+# =================================================
+/ip firewall filter
+add chain=forward src-address-list=pppoe-blocked action=drop \
+comment="SEC-DROP PPPoE blocked" place-before=0
+
+# =================================================
+# [10] SCRIPT AUTO BLOCK PPPoE USER
+# =================================================
+/system script
+add name=auto-block-pppoe-ddoser policy=read,write,test source={
+
+    :foreach a in=[/ip firewall address-list find list=ddoser] do={
+
+        :local badIP [/ip firewall address-list get $a address]
+
+        :foreach s in=[/ppp active find address=$badIP] do={
+
+            :local user [/ppp active get $s name]
+
+            :if ([:len $user] > 0) do={
+
+                :if ([:len [/ip firewall address-list find list=pppoe-blocked comment=$user]] = 0) do={
+
+                    :log warning ("SECURITY: PPPoE BLOCK → " . $user . " | IP: " . $badIP)
+
+                    /ip firewall address-list add \
+                        list=pppoe-blocked \
+                        address=$badIP \
+                        timeout=30m \
+                        comment=$user
+                }
+            }
+        }
+    }
+}
+
+# =================================================
+# [11] SCHEDULER AUTO BLOCK
+# =================================================
+/system scheduler
+add name=auto-block-pppoe-ddoser interval=30s \
+on-event=auto-block-pppoe-ddoser \
+comment="SEC Auto block PPPoE nakal"
+
+:log info "SECURITY: Anti Totolink + Anti Internet + Auto Block AKTIF"
