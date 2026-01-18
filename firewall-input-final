@@ -1,0 +1,96 @@
+############################################
+# FIREWALL INPUT FINAL - RTRWNet SAFE
+# Fungsi : Proteksi router (INPUT only)
+# Tanpa tarpit | CPU ringan | Best practice
+############################################
+
+/ip firewall filter
+
+# ===============================
+# 1. DROP INVALID (PALING ATAS)
+# ===============================
+add chain=input connection-state=invalid \
+    action=drop comment="INPUT: Drop invalid packets"
+
+# ===============================
+# 2. ALLOW ESTABLISHED & RELATED
+# ===============================
+add chain=input connection-state=established,related \
+    action=accept comment="INPUT: Allow established & related"
+
+# ===============================
+# 3. ALLOW INPUT DARI LAN
+# ===============================
+add chain=input in-interface-list=LAN \
+    action=accept comment="INPUT: Allow from LAN"
+
+# ===============================
+# 4. ALLOW ICMP TERBATAS (PING)
+# ===============================
+add chain=input protocol=icmp limit=10,20 \
+    action=accept comment="INPUT: Allow ICMP limited"
+
+# ===============================
+# 5. DNS ROUTER HANYA UNTUK LOKAL
+# ===============================
+add chain=input protocol=udp dst-port=53 \
+    src-address-list=lokal \
+    action=accept comment="INPUT: DNS UDP local only"
+
+add chain=input protocol=tcp dst-port=53 \
+    src-address-list=lokal \
+    action=accept comment="INPUT: DNS TCP local only"
+
+# ===============================
+# 6. DETEKSI BRUTE FORCE SSH
+# ===============================
+add chain=input protocol=tcp dst-port=22 \
+    in-interface-list=WAN \
+    connection-state=new \
+    connection-limit=3,32 \
+    action=add-src-to-address-list \
+    address-list=penyusup \
+    address-list-timeout=1d \
+    comment="INPUT: Detect SSH brute force"
+
+add chain=input protocol=tcp dst-port=22 \
+    src-address-list=penyusup \
+    action=drop comment="INPUT: Drop SSH brute force"
+
+# ===============================
+# 7. PROTEKSI WINBOX (PORT 8291)
+# ===============================
+add chain=input protocol=tcp dst-port=8291 \
+    in-interface-list=WAN \
+    connection-state=new \
+    connection-limit=3,32 \
+    action=add-src-to-address-list \
+    address-list=penyusup \
+    address-list-timeout=1d \
+    comment="INPUT: Detect Winbox brute force"
+
+add chain=input protocol=tcp dst-port=8291 \
+    src-address-list=penyusup \
+    action=drop comment="INPUT: Drop Winbox brute force"
+
+# ===============================
+# 8. DROP SEMUA INPUT DARI WAN
+# ===============================
+add chain=input in-interface-list=WAN \
+    action=drop comment="INPUT: Drop all from WAN"
+
+############################################
+# END OF FIREWALL INPUT
+############################################
+
+YANG HARUS ADA SEBELUM IMPORT
+/interface list
+add name=WAN
+add name=LAN
+
+
+/ip firewall address-list
+add list=lokal address=192.168.0.0/16
+
+
+
