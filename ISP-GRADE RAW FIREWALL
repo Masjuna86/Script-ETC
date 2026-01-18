@@ -1,0 +1,109 @@
+# =========================================
+# ISP-GRADE RAW FIREWALL MULTI-WAN (FINAL)
+# RouterOS v6 / v7
+# =========================================
+
+/interface list
+add name=WAN comment="All Internet Interfaces"
+
+/interface list member
+# GANTI interface sesuai WAN Anda
+add interface=ether1 list=WAN
+add interface=ether2 list=WAN
+add interface=sfp1   list=WAN
+
+/ip firewall raw
+
+# -----------------------------------------
+# [0] INVALID PACKET
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    connection-state=invalid \
+    comment="CNT: INVALID Packet Attack"
+
+# -----------------------------------------
+# [1] TCP SCAN PROTECTION
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=tcp tcp-flags=fin,!syn,!rst,!ack \
+    comment="CNT: TCP FIN Scan"
+
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=tcp tcp-flags=fin,psh,urg,!syn,!rst,!ack \
+    comment="CNT: TCP XMAS Scan"
+
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=tcp tcp-flags=syn,rst \
+    comment="CNT: TCP SYN-RST Scan"
+
+# -----------------------------------------
+# [2] TCP SYN FLOOD
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=tcp tcp-flags=syn \
+    connection-limit=30,32 \
+    comment="CNT: TCP SYN Flood"
+
+# -----------------------------------------
+# [3] UDP FLOOD BASIC
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=udp packet-size=0-32 \
+    comment="CNT: UDP Tiny Packet Flood"
+
+# -----------------------------------------
+# [4] BOTNET & MALWARE PORT
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=tcp dst-port=23,5555,28015,28016,28316 \
+    comment="CNT: Botnet TCP Port Attack"
+
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=udp dst-port=23,5555,28015,28016,28316 \
+    comment="CNT: Botnet UDP Port Attack"
+
+# -----------------------------------------
+# [5] WINDOWS / LEGACY EXPLOIT
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=udp dst-port=135-139 \
+    comment="CNT: NetBIOS Attack"
+
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=tcp dst-port=445 \
+    comment="CNT: SMB TCP Attack"
+
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=udp dst-port=445 \
+    comment="CNT: SMB UDP Attack"
+
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=udp dst-port=1434 \
+    comment="CNT: SQL Slammer Attack"
+
+# -----------------------------------------
+# [6] IKE / IPSEC FLOOD
+# HAPUS JIKA PAKAI IPSEC
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN action=drop \
+    protocol=udp dst-port=500,4500 \
+    comment="CNT: IKE/IPsec Flood"
+
+# -----------------------------------------
+# [7] PORT SCANNER DETECTION
+# -----------------------------------------
+add chain=prerouting in-interface-list=WAN \
+    action=add-src-to-address-list \
+    protocol=tcp psd=21,3s,3,1 \
+    address-list=PORT_SCANNER \
+    address-list-timeout=1d \
+    comment="CNT: Port Scanner Detected"
+
+add chain=prerouting in-interface-list=WAN \
+    action=drop \
+    src-address-list=PORT_SCANNER \
+    comment="CNT: Port Scanner Dropped"
+
+# =========================================
+# END OF FINAL ISP-GRADE RAW FIREWALL
+# =========================================
